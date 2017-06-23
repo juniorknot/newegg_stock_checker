@@ -1,5 +1,6 @@
 
 import requests
+import dryscrape
 import browser_cookie
 import sys
 import time
@@ -8,16 +9,21 @@ from bs4 import BeautifulSoup
 from pushbullet import PushBullet
 
 monitor_list = [
-    #'https://www.newegg.ca/Product/Product.aspx?Item=9SIA7RD5UG3951&cm_re=rx_580-_-9SIA7RD5UG3951-_-Product',
-    #'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814137117&cm_re=rx_580-_-14-137-117-_-Product',
-    #'https://www.newegg.ca/Product/Product.aspx?Item=9SIA7BB5VA5029&cm_re=rx_580-_-14-137-120-_-Product',
+    'https://www.newegg.ca/Product/Product.aspx?Item=9SIA7BB5VA5029&cm_re=rx_580-_-14-137-120-_-Product',
+    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814131719&cm_re=rx_580-_-14-131-719-_-Product',
+    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814131713&cm_re=rx_580-_-14-131-713-_-Product',
+    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814125962&cm_re=rx_580-_-14-125-962-_-Product',
+    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814126192&cm_re=rx_580-_-14-126-192-_-Product',
+    'https://www.newegg.ca/Product/Product.aspx?Item=9SIA7RD5UG3380&cm_re=rx_580-_-14-126-196-_-Product',
+    'https://www.newegg.ca/Product/Product.aspx?Item=9SIA93K5VS4580&cm_re=rx_580-_-9SIA93K5VS4580-_-Product',
+    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814137135&cm_re=rx_580-_-14-137-135-_-Product',
     'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814125964&cm_re=rx_580-_-14-125-964-_-Product'
 ]
 
 pushbulley_key_file = "pushbullet.key"
 
-s = requests.session()
-s.headers.update({'User-Agent' : 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0'})
+s = dryscrape.Session()
+s.set_header('User-Agent', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0')
 time.sleep(3)
 
 # pushbullet
@@ -27,36 +33,41 @@ pb = PushBullet(pushbullet_key)
 
 while True:
     for url in monitor_list:
-        r = s.get(url)
-        if r.status_code == 200:
-            data = r.text
-            soup = BeautifulSoup(data, "html.parser")
+        s.visit(url)
+        data = s.body()
+        soup = BeautifulSoup(data, "html.parser")
 
-            # check seller
-            seller = ""
-            seller_divs = soup.find_all("div", {"class": "seller"})
-            print seller_divs
+        # check seller
+        seller = ""
+        seller_divs = soup.find_all("div", {"class": "seller"})
+        if seller_divs != None and seller_divs != []:
+            seller = seller_divs[0].a.string
+            print seller
+        else:
+            seller_divs = soup.find_all("div", {"class": "featured-seller"})
             if seller_divs != None and seller_divs != []:
-                seller = seller_divs[0].a.string
+                seller = seller_divs[0].div.strong.string
                 print seller
+        if seller == "":
+            print "seller error"
+
+        can_buy = False
+        cart_div = soup.find(id="landingpage-cart")
+        if cart_div != None:
+            if "ADD TO CART" in cart_div:
+                can_buy = True
+                print "can buy"
             else:
-                seller_divs = soup.find_all("div", {"class": "featured-seller"})
-                if seller_divs != None and seller_divs != []:
-                    seller = seller_divs[0].div.strong.string
-                    print seller
-            if seller == "":
-                print "seller error"
+                print "not available"
+        else:
+            print "cart error"
 
-            print soup.prettify()
-            cart_div = soup.find(id="landingpage-cart")
+        if seller.strip() == "Newegg" and can_buy:
+            pb.push_link("newegg", url)
 
-            print cart_div.string
-            print cart_div.childern
+        time.sleep(10)
 
-            time.sleep(10)
-        print ""
-
-
+    time.sleep(30)
 
     sys.exit()
 
