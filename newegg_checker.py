@@ -1,7 +1,8 @@
 
 import requests
 import dryscrape
-import browser_cookie
+import webkit_server
+#import browser_cookie
 import sys
 import time
 from bs4 import BeautifulSoup
@@ -33,8 +34,12 @@ pb = PushBullet(pushbullet_key)
 
 while True:
     for url in monitor_list:
-        s.visit(url)
-        data = s.body()
+        try:
+            s.visit(url)
+            data = s.body()
+
+        except webkit_server.InvalidResponseError:
+            continue
         soup = BeautifulSoup(data, "html.parser")
 
         # check seller
@@ -54,7 +59,7 @@ while True:
         can_buy = False
         cart_div = soup.find(id="landingpage-cart")
         if cart_div != None:
-            if "ADD TO CART" in cart_div:
+            if "ADD TO CART" in cart_div.prettify():
                 can_buy = True
                 print "can buy"
             else:
@@ -69,7 +74,6 @@ while True:
 
     time.sleep(30)
 
-    sys.exit()
 
 
 
