@@ -1,8 +1,5 @@
 
 import requests
-import dryscrape
-import webkit_server
-#import browser_cookie
 import sys
 import time
 from bs4 import BeautifulSoup
@@ -10,21 +7,27 @@ from bs4 import BeautifulSoup
 from pushbullet import PushBullet
 
 monitor_list = [
-    'https://www.newegg.ca/Product/Product.aspx?Item=9SIA7BB5VA5029&cm_re=rx_580-_-14-137-120-_-Product',
-    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814131719&cm_re=rx_580-_-14-131-719-_-Product',
-    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814131713&cm_re=rx_580-_-14-131-713-_-Product',
-    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814125962&cm_re=rx_580-_-14-125-962-_-Product',
-    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814126192&cm_re=rx_580-_-14-126-192-_-Product',
-    'https://www.newegg.ca/Product/Product.aspx?Item=9SIA7RD5UG3380&cm_re=rx_580-_-14-126-196-_-Product',
-    'https://www.newegg.ca/Product/Product.aspx?Item=9SIA93K5VS4580&cm_re=rx_580-_-9SIA93K5VS4580-_-Product',
-    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814137135&cm_re=rx_580-_-14-137-135-_-Product',
-    'https://www.newegg.ca/Product/Product.aspx?Item=N82E16814125964&cm_re=rx_580-_-14-125-964-_-Product'
+    '9SIA7BB5V53526',
+    'N82E16814202278',
+    'N82E16814137120',
+    'N82E16814131719',
+    'N82E16814131713',
+    'N82E16814137135',
+    'N82E16814125962',
+    'N82E16814202279',
+    'N82E16814125964',
+    'N82E16814126192',
+    'N82E16814202277'
 ]
 
 pushbulley_key_file = "pushbullet.key"
 
-s = dryscrape.Session()
-s.set_header('User-Agent', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:53.0) Gecko/20100101 Firefox/53.0')
+s = requests.session()
+s.headers.update({'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A5376e Safari/8536.2'})
+
+web_url_base = "https://www.newegg.ca/Product/Product.aspx?Item="
+api_url_base = "http://www.ows.newegg.ca/Products.egg/"
+
 time.sleep(3)
 
 # pushbullet
@@ -33,42 +36,23 @@ with open(pushbulley_key_file, "r") as file:
 pb = PushBullet(pushbullet_key)
 
 while True:
-    for url in monitor_list:
-        try:
-            s.visit(url)
-            data = s.body()
+    for item in monitor_list:
+        r = s.get(api_url_base + item)
+        data = None
+        if r.status_code == 200:
+            data = r.json()
 
-        except webkit_server.InvalidResponseError:
-            continue
-        soup = BeautifulSoup(data, "html.parser")
-
-        # check seller
-        seller = ""
-        seller_divs = soup.find_all("div", {"class": "seller"})
-        if seller_divs != None and seller_divs != []:
-            seller = seller_divs[0].a.string
-            print seller
-        else:
-            seller_divs = soup.find_all("div", {"class": "featured-seller"})
-            if seller_divs != None and seller_divs != []:
-                seller = seller_divs[0].div.strong.string
-                print seller
-        if seller == "":
-            print "seller error"
-
-        can_buy = False
-        cart_div = soup.find(id="landingpage-cart")
-        if cart_div != None:
-            if "ADD TO CART" in cart_div.prettify():
+        if data and isinstance(data, dict):
+            final_price = 999
+            can_buy = False
+            final_price = float(data['Basic']['FinalPrice'][1:])
+            if data['Basic']['AddToCartText'] == 'Add To Cart':
                 can_buy = True
-                print "can buy"
-            else:
-                print "not available"
-        else:
-            print "cart error"
+            print final_price
+            print can_buy
 
-        if seller.strip() == "Newegg" and can_buy:
-            pb.push_link("newegg", url)
+        if final_price < 400 and can_buy:
+            pb.push_link("newegg", web_url_base + item)
 
         time.sleep(10)
 
